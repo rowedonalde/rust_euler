@@ -1,5 +1,3 @@
-use std::process;
-
 fn main() {
     let bignum = "\
         73167176531330624919225119674426574742355349194934\
@@ -23,71 +21,56 @@ fn main() {
         05886116467109405077541002256983155200055935729725\
         71636269561882670428252483600823257530420752963450";
 
-    let slice_len = 13usize;
-    let mut i = 0;
-    let mut last_good_i: Option<usize>;
+    let mult_len = 13;
     let mut biggest = 0;
-    let mut last_pr = 0;
- 
-    while i + slice_len <= 1000 {
-        match next_slice(&bignum, i, slice_len) {
-            Some(good_slice_i) => {
-                let good_slice = 
-                    &bignum[good_slice_i..good_slice_i + slice_len];
-                println!("Good slice is {} at index {}",
-                    good_slice, good_slice_i);
 
-                // If two slices are adjacent, multiply in the new number
-                // and divide out the leftmost number:
-                match last_good_i {
-                    // First number we've seen:
-                    None => {
-                        biggest = last_pr = multiply_digits(good_slice);
-                        last_good_i = i;
-                    },
-                    Some(lgi) => {
-                        if lgi == 
-                    },
-                }
+    // Break the bignum up into a vector of slices split apart
+    // by the zero digits. If any slices are less than 13 chars
+    // long, don't keep them.
+    let slices: Vec<&str> = bignum.split('0').filter(|x| x.len() >= mult_len)
+        .collect();
 
-                i = good_slice_i + 1;
-            },
- 
-            None => break,
+    for slice in slices.iter() {
+        let slice_len = slice.len();
+
+        // The number of shifts right we'll make:
+        let shifts = (slice_len as i32) - (mult_len as i32);
+
+        // Get seed product for this slice:
+        let mut seed = multiply_digits(&slice[0..mult_len]);
+
+        if seed > biggest {
+            biggest = seed;
         }
-    }
-}
 
-fn next_slice(bignum: &str, start_i: usize, length: usize) -> Option<usize> {
-    let mut i = start_i;
+        // Got caught up on an off-by-one error here. Since
+        // we're essentially indexing from 1 (because var i is
+        // how many to the right we're shifted right now) we
+        // still want to include the number of shifts in the
+        // iteration. Therefore, we should end with shifts + 1.
+        for i in 1..(shifts as usize) + 1 {
+            // To get each successive product, divide out the
+            // previous leftmost digit and multiply in the new
+            // rightmost digit:
+            let old = &slice[i - 1..i].parse().ok()
+                .expect("Parsing failed.");
+            let new = &slice[i + mult_len - 1..i + mult_len].parse().ok()
+                .expect("Parsing failed.");
+            seed = seed / old * new;
 
-    let mut keep_searching = true;
-
-    while keep_searching {
-        keep_searching = false;
-        let try_slice = &bignum[i..i + length];
-        for (j, val) in try_slice.char_indices().rev() {
-            if val == '0' {
-                // We just found a zero, so we want to start over:
-                i = i + j + 1;
-
-                // If this would overflow the end index, confirm that
-                // there are no more valid slices:
-                if i + length > bignum.len() {
-                    return None;
-                }
-
-                keep_searching = true;
-                break;
+            if seed > biggest {
+                biggest = seed;
             }
         }
     }
 
-    Some(i)
+    println!("Biggest product: {}", biggest);
 }
 
 fn multiply_digits(slice: &str) -> i64 {
-    let mut digits: i64 = slice.parse().ok().expect("Parsing failed.");
+    let error_text = format!("Parsing failed on {}", slice);
+    let mut digits: i64 = slice.parse().ok()
+        .expect(&error_text);
     let mut product = 1;
 
     while digits > 0 {
